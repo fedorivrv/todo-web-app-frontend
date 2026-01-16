@@ -37,6 +37,13 @@ type TasksState = {
   createTask: (title: string, priority?: number) => Promise<void>;
   toggleDone: (id: string, done: boolean) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
+  updatePriority: (id: string, priority: number) => Promise<void>;
+
+  // generic update (useful for next steps: category/dueDate)
+  updateTaskField: <K extends keyof Pick<Task, "title" | "description" | "priority" | "done" | "category" | "dueDate">>(
+    id: string,
+    patch: Pick<Task, K>
+  ) => Promise<void>;
 
   // filters/actions
   setQ: (q: string) => void;
@@ -76,9 +83,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
         page: number;
         limit: number;
         totalPages: number;
-      }>("/api/tasks", {
-        params: { q, status, sort, order, page, limit },
-      });
+      }>("/api/tasks", { params: { q, status, sort, order, page, limit } });
 
       set({
         tasks: res.data.tasks,
@@ -100,12 +105,8 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     set({ loading: true, error: null });
 
     try {
-      const res = await api.post<{ task: Task }>("/api/tasks", {
-        title,
-        priority,
-      });
+      const res = await api.post<{ task: Task }>("/api/tasks", { title, priority });
 
-      // Додаємо на початок, бо зазвичай sort = createdAt desc
       set((state) => ({
         tasks: [res.data.task, ...state.tasks],
         total: state.total + 1,
@@ -119,63 +120,69 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     }
   },
 
-  toggleDone: async (id: string, done: boolean) => {
+  updateTaskField: async (id, patch) => {
     set({ error: null });
 
-    // optimistic
+    // optimistic merge
+    const prev = get().tasks.find((t) => t._id === id) ?? null;
     set((state) => ({
-      tasks: state.tasks.map((t) => (t._id === id ? { ...t, done } : t)),
+      tasks: state.tasks.map((t) => (t._id === id ? { ...t, ...patch } : t)),
     }));
 
     try {
-      const res = await api.patch<{ task: Task }>(`/api/tasks/${id}`, { done });
+      const res = await api.patch<{ task: Task }>(`/api/tasks/${id}`, patch);
 
       set((state) => ({
         tasks: state.tasks.map((t) => (t._id === id ? res.data.task : t)),
       }));
     } catch (err: any) {
-      // rollback
+      // rollback to previous snapshot if we had it
       set((state) => ({
-        tasks: state.tasks.map((t) => (t._id === id ? { ...t, done: !done } : t)),
+        tasks: prev ? state.tasks.map((t) => (t._id === id ? prev : t)) : state.tasks,
         error: err.response?.data?.message || err.message || "Failed to update task",
       }));
     }
   },
 
+  toggleDone: async (id: string, done: boolean) => {
+    await get().updateTaskField(id, { done });
+  },
+
+  updatePriority: async (id: string, priority: number) => {
+    const p = Math.max(1, Math.min(10, Math.trunc(priority)));
+    await get().updateTaskField(id, { priority: p });
+  },
+
   deleteTask: async (id: string) => {
     set({ error: null });
 
-    let removed: Task | null = null;
+    const prevTasks = get().tasks;
+    const removed = prevTasks.find((t) => t._id === id) ?? null;
 
     // optimistic remove
-    set((state) => {
-      removed = state.tasks.find((t) => t._id === id) ?? null;
-      return {
-        tasks: state.tasks.filter((t) => t._id !== id),
-        total: Math.max(0, state.total - 1),
-      };
-    });
+    set((state) => ({
+      tasks: state.tasks.filter((t) => t._id !== id),
+      total: Math.max(0, state.total - 1),
+    }));
 
     try {
       await api.delete(`/api/tasks/${id}`);
     } catch (err: any) {
       // rollback
-      set((state) => ({
-        tasks: removed ? [removed, ...state.tasks] : state.tasks,
-        total: removed ? state.total + 1 : state.total,
+      set({
+        tasks: removed ? [removed, ...prevTasks] : prevTasks,
+        total: removed ? get().total + 1 : get().total,
         error: err.response?.data?.message || err.message || "Failed to delete task",
-      }));
+      });
     }
   },
 
-  // setters (скидаємо page до 1 при зміні фільтрів)
   setQ: (q: string) => set({ q, page: 1 }),
   setStatus: (status: StatusFilter) => set({ status, page: 1 }),
   setSort: (sort: SortField) => set({ sort, page: 1 }),
   setOrder: (order: SortOrder) => set({ order, page: 1 }),
   setPage: (page: number) => set({ page }),
 
-  // helpers
   apply: async () => {
     await get().fetchTasks();
   },

@@ -10,7 +10,6 @@ export default function HomePage() {
     loading,
     error,
 
-    // query state
     q,
     status,
     sort,
@@ -18,20 +17,18 @@ export default function HomePage() {
     page,
     totalPages,
 
-    // actions
     fetchTasks,
     createTask,
     toggleDone,
     deleteTask,
+    updatePriority,
 
-    // setters
     setQ,
     setStatus,
     setSort,
     setOrder,
     setPage,
 
-    // helpers
     apply,
     resetFilters,
   } = useTasksStore();
@@ -65,9 +62,7 @@ export default function HomePage() {
   return (
     <main style={{ padding: 24, maxWidth: 760, margin: "0 auto" }}>
       <header style={{ marginBottom: 16 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 6 }}>
-          Tasks
-        </h1>
+        <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 6 }}>Tasks</h1>
         <div style={{ opacity: 0.7, fontSize: 13 }}>
           {activeSubtitle} • total={total}
         </div>
@@ -178,11 +173,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {error && (
-        <p style={{ color: "red", marginBottom: 12 }}>
-          {error}
-        </p>
-      )}
+      {error && <p style={{ color: "red", marginBottom: 12 }}>{error}</p>}
 
       {/* Tasks list */}
       <section style={{ marginBottom: 16 }}>
@@ -219,18 +210,35 @@ export default function HomePage() {
                     checked={task.done}
                     onChange={(e) => toggleDone(task._id, e.target.checked)}
                   />
+
                   <span
                     style={{
                       textDecoration: task.done ? "line-through" : "none",
                       opacity: task.done ? 0.6 : 1,
                       wordBreak: "break-word",
+                      flex: 1,
                     }}
                   >
                     {task.title}
                   </span>
-                  <span style={{ opacity: 0.6, whiteSpace: "nowrap" }}>
-                    p:{task.priority}
-                  </span>
+
+                  {/* Priority editor */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ opacity: 0.6 }}>p:</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={task.priority}
+                      onChange={(e) => updatePriority(task._id, Number(e.target.value))}
+                      style={{
+                        width: 64,
+                        padding: "6px 8px",
+                        border: "1px solid #ccc",
+                        borderRadius: 8,
+                      }}
+                    />
+                  </div>
                 </label>
 
                 <button
