@@ -1,17 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTasksStore } from "@/store/tasks.store";
 
 export default function HomePage() {
   const {
     tasks,
+    total,
     loading,
     error,
+
+    // query state
+    q,
+    status,
+    sort,
+    order,
+    page,
+    totalPages,
+
+    // actions
     fetchTasks,
     createTask,
     toggleDone,
     deleteTask,
+
+    // setters
+    setQ,
+    setStatus,
+    setSort,
+    setOrder,
+    setPage,
+
+    // helpers
+    apply,
+    resetFilters,
   } = useTasksStore();
 
   const [title, setTitle] = useState("");
@@ -19,6 +41,18 @@ export default function HomePage() {
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
+
+  const canPrev = page > 1;
+  const canNext = page < totalPages;
+
+  const activeSubtitle = useMemo(() => {
+    const parts: string[] = [];
+    if (q.trim()) parts.push(`q="${q.trim()}"`);
+    if (status !== "all") parts.push(`status=${status}`);
+    parts.push(`sort=${sort}:${order}`);
+    parts.push(`page=${page}/${totalPages || 1}`);
+    return parts.join(" • ");
+  }, [q, status, sort, order, page, totalPages]);
 
   const onAdd = async () => {
     const value = title.trim();
@@ -29,105 +63,223 @@ export default function HomePage() {
   };
 
   return (
-    <main style={{ padding: 24, maxWidth: 640, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 16 }}>
-        Tasks
-      </h1>
+    <main style={{ padding: 24, maxWidth: 760, margin: "0 auto" }}>
+      <header style={{ marginBottom: 16 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 6 }}>
+          Tasks
+        </h1>
+        <div style={{ opacity: 0.7, fontSize: 13 }}>
+          {activeSubtitle} • total={total}
+        </div>
+      </header>
 
       {/* Create task */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="New task title..."
-          style={{
-            flex: 1,
-            padding: 10,
-            border: "1px solid #ccc",
-            borderRadius: 8,
-          }}
-        />
-        <button
-          onClick={onAdd}
-          disabled={loading}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 8,
-            cursor: loading ? "not-allowed" : "pointer",
-          }}
-        >
-          Add
-        </button>
-      </div>
+      <section style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="New task title..."
+            style={{
+              flex: 1,
+              padding: 10,
+              border: "1px solid #ccc",
+              borderRadius: 8,
+            }}
+          />
+          <button
+            onClick={onAdd}
+            disabled={loading}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              cursor: loading ? "not-allowed" : "pointer",
+            }}
+          >
+            Add
+          </button>
+        </div>
+      </section>
+
+      {/* Filters */}
+      <section style={{ marginBottom: 16 }}>
+        <div style={{ display: "grid", gap: 8 }}>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search tasks..."
+            style={{
+              padding: 10,
+              border: "1px solid #ccc",
+              borderRadius: 8,
+            }}
+          />
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as any)}
+              style={{
+                padding: 10,
+                border: "1px solid #ccc",
+                borderRadius: 8,
+              }}
+              aria-label="Filter by status"
+            >
+              <option value="all">All</option>
+              <option value="done">Done</option>
+              <option value="undone">Undone</option>
+            </select>
+
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as any)}
+              style={{
+                padding: 10,
+                border: "1px solid #ccc",
+                borderRadius: 8,
+              }}
+              aria-label="Sort field"
+            >
+              <option value="createdAt">Created date</option>
+              <option value="priority">Priority</option>
+            </select>
+
+            <select
+              value={order}
+              onChange={(e) => setOrder(e.target.value as any)}
+              style={{
+                padding: 10,
+                border: "1px solid #ccc",
+                borderRadius: 8,
+              }}
+              aria-label="Sort order"
+            >
+              <option value="desc">Desc</option>
+              <option value="asc">Asc</option>
+            </select>
+
+            <button
+              onClick={apply}
+              disabled={loading}
+              style={{ padding: "10px 14px", borderRadius: 8 }}
+            >
+              Apply
+            </button>
+
+            <button
+              onClick={resetFilters}
+              disabled={loading}
+              style={{ padding: "10px 14px", borderRadius: 8 }}
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      </section>
 
       {error && (
-        <p style={{ color: "red", marginBottom: 12 }}>{error}</p>
+        <p style={{ color: "red", marginBottom: 12 }}>
+          {error}
+        </p>
       )}
 
       {/* Tasks list */}
-      {loading && tasks.length === 0 ? (
-        <p>Loading...</p>
-      ) : (
-        <ul style={{ display: "grid", gap: 8 }}>
-          {tasks.map((task) => (
-            <li
-              key={task._id}
-              style={{
-                padding: 12,
-                border: "1px solid #eee",
-                borderRadius: 10,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-              }}
-            >
-              <label
+      <section style={{ marginBottom: 16 }}>
+        {loading && tasks.length === 0 ? (
+          <p>Loading...</p>
+        ) : tasks.length === 0 ? (
+          <p style={{ opacity: 0.7 }}>No tasks found.</p>
+        ) : (
+          <ul style={{ display: "grid", gap: 8 }}>
+            {tasks.map((task) => (
+              <li
+                key={task._id}
                 style={{
+                  padding: 12,
+                  border: "1px solid #eee",
+                  borderRadius: 10,
                   display: "flex",
                   alignItems: "center",
-                  gap: 10,
-                  flex: 1,
-                  cursor: "pointer",
+                  justifyContent: "space-between",
+                  gap: 12,
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={task.done}
-                  onChange={(e) =>
-                    toggleDone(task._id, e.target.checked)
-                  }
-                />
-                <span
+                <label
                   style={{
-                    textDecoration: task.done
-                      ? "line-through"
-                      : "none",
-                    opacity: task.done ? 0.6 : 1,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    flex: 1,
+                    cursor: "pointer",
                   }}
                 >
-                  {task.title}
-                </span>
-                <span style={{ opacity: 0.6 }}>
-                  p:{task.priority}
-                </span>
-              </label>
+                  <input
+                    type="checkbox"
+                    checked={task.done}
+                    onChange={(e) => toggleDone(task._id, e.target.checked)}
+                  />
+                  <span
+                    style={{
+                      textDecoration: task.done ? "line-through" : "none",
+                      opacity: task.done ? 0.6 : 1,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {task.title}
+                  </span>
+                  <span style={{ opacity: 0.6, whiteSpace: "nowrap" }}>
+                    p:{task.priority}
+                  </span>
+                </label>
 
-              <button
-                onClick={() => deleteTask(task._id)}
-                title="Delete task"
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                }}
-              >
-                🗑️
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+                <button
+                  onClick={() => deleteTask(task._id)}
+                  title="Delete task"
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                  }}
+                >
+                  🗑️
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Pagination */}
+      <footer style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <button
+          onClick={() => {
+            if (!canPrev) return;
+            setPage(page - 1);
+            apply();
+          }}
+          disabled={!canPrev || loading}
+          style={{ padding: "10px 14px", borderRadius: 8 }}
+        >
+          Prev
+        </button>
+
+        <div style={{ opacity: 0.75 }}>
+          Page <b>{page}</b> / <b>{totalPages || 1}</b>
+        </div>
+
+        <button
+          onClick={() => {
+            if (!canNext) return;
+            setPage(page + 1);
+            apply();
+          }}
+          disabled={!canNext || loading}
+          style={{ padding: "10px 14px", borderRadius: 8 }}
+        >
+          Next
+        </button>
+      </footer>
     </main>
   );
 }
