@@ -3,6 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTasksStore } from "@/store/tasks.store";
 
+function toDateInputValue(isoOrNull: string | null): string {
+  if (!isoOrNull) return "";
+  const d = new Date(isoOrNull);
+  if (Number.isNaN(d.getTime())) return "";
+  // YYYY-MM-DD
+  return d.toISOString().slice(0, 10);
+}
+
 export default function HomePage() {
   const {
     tasks,
@@ -36,6 +44,7 @@ export default function HomePage() {
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
+  const [dueDate, setDueDate] = useState(""); // YYYY-MM-DD або ""
 
   useEffect(() => {
     fetchTasks();
@@ -57,17 +66,26 @@ export default function HomePage() {
     const value = title.trim();
     if (!value) return;
 
-    await createTask(value, 5, category);
+    // createTask вже підтримує category, а dueDate поки не передаємо сюди (бо в store ми не змінювали сигнатуру)
+   await createTask(
+  value,
+  5,
+  category.trim() ? category : null,
+  dueDate ? dueDate : null
+);
+
+    // Якщо хочеш додавати dueDate при створенні — скажи, і я дам оновлення store + бек-DTO
+    // Наразі dueDate редагується після створення.
+
     setTitle("");
     setCategory("");
+    setDueDate("");
   };
 
   return (
-    <main style={{ padding: 24, maxWidth: 820, margin: "0 auto" }}>
+    <main style={{ padding: 24, maxWidth: 920, margin: "0 auto" }}>
       <header style={{ marginBottom: 16 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 6 }}>
-          Tasks
-        </h1>
+        <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 6 }}>Tasks</h1>
         <div style={{ opacity: 0.7, fontSize: 13 }}>
           {activeSubtitle} • total={total}
         </div>
@@ -101,16 +119,36 @@ export default function HomePage() {
             </button>
           </div>
 
-          <input
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="Category (optional) e.g. work, home"
-            style={{
-              padding: 10,
-              border: "1px solid #ccc",
-              borderRadius: 8,
-            }}
-          />
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <input
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="Category (optional) e.g. work, home"
+              style={{
+                flex: "1 1 220px",
+                padding: 10,
+                border: "1px solid #ccc",
+                borderRadius: 8,
+              }}
+            />
+
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              style={{
+                flex: "0 0 170px",
+                padding: 10,
+                border: "1px solid #ccc",
+                borderRadius: 8,
+              }}
+              aria-label="Due date (optional)"
+            />
+          </div>
+
+          <div style={{ opacity: 0.6, fontSize: 12 }}>
+            Note: due date is edited after creation (inline). If you want due date on create, say so.
+          </div>
         </div>
       </section>
 
@@ -294,7 +332,27 @@ export default function HomePage() {
                       }
                       placeholder="(none)"
                       style={{
-                        width: 180,
+                        width: 200,
+                        padding: "6px 8px",
+                        border: "1px solid #ccc",
+                        borderRadius: 8,
+                      }}
+                    />
+                  </div>
+
+                  {/* Due date editor */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ opacity: 0.6 }}>Due</span>
+                    <input
+                      type="date"
+                      value={toDateInputValue(task.dueDate)}
+                      onChange={(e) =>
+                        updateTaskField(task._id, {
+                          dueDate: e.target.value ? e.target.value : null,
+                        })
+                      }
+                      style={{
+                        width: 170,
                         padding: "6px 8px",
                         border: "1px solid #ccc",
                         borderRadius: 8,

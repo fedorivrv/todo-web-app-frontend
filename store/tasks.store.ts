@@ -34,7 +34,12 @@ type TasksState = {
 
   // actions
   fetchTasks: () => Promise<void>;
-  createTask: (title: string, priority?: number, category?: string | null) => Promise<void>;
+  createTask: (
+  title: string,
+  priority?: number,
+  category?: string | null,
+  dueDate?: string | null
+) => Promise<void>;
   toggleDone: (id: string, done: boolean) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   updatePriority: (id: string, priority: number) => Promise<void>;
@@ -102,28 +107,34 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     }
   },
 
-  createTask: async (title: string, priority = 5, category: string | null = null) => {
-    set({ loading: true, error: null });
+  createTask: async (
+  title: string,
+  priority = 5,
+  category: string | null = null,
+  dueDate: string | null = null
+) => {
+  set({ loading: true, error: null });
 
-    try {
-      const res = await api.post<{ task: Task }>("/api/tasks", {
-        title,
-        priority,
-        category: category && category.trim() ? category.trim() : null,
-      });
+  try {
+    const res = await api.post<{ task: Task }>("/api/tasks", {
+      title,
+      priority,
+      category: category && category.trim() ? category.trim() : null,
+      dueDate: dueDate ? dueDate : null, // YYYY-MM-DD або null
+    });
 
-      set((state) => ({
-        tasks: [res.data.task, ...state.tasks],
-        total: state.total + 1,
-        loading: false,
-      }));
-    } catch (err: any) {
-      set({
-        error: err.response?.data?.message || err.message || "Failed to create task",
-        loading: false,
-      });
-    }
-  },
+    set((state) => ({
+      tasks: [res.data.task, ...state.tasks],
+      total: state.total + 1,
+      loading: false,
+    }));
+  } catch (err: any) {
+    set({
+      error: err.response?.data?.message || err.message || "Failed to create task",
+      loading: false,
+    });
+  }
+},
 
   updateTaskField: async (id, patch) => {
     set({ error: null });
