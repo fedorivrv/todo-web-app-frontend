@@ -22,6 +22,7 @@ export default function HomePage() {
     toggleDone,
     deleteTask,
     updatePriority,
+    updateTaskField,
 
     setQ,
     setStatus,
@@ -34,6 +35,7 @@ export default function HomePage() {
   } = useTasksStore();
 
   const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("");
 
   useEffect(() => {
     fetchTasks();
@@ -55,14 +57,17 @@ export default function HomePage() {
     const value = title.trim();
     if (!value) return;
 
-    await createTask(value, 5);
+    await createTask(value, 5, category);
     setTitle("");
+    setCategory("");
   };
 
   return (
-    <main style={{ padding: 24, maxWidth: 760, margin: "0 auto" }}>
+    <main style={{ padding: 24, maxWidth: 820, margin: "0 auto" }}>
       <header style={{ marginBottom: 16 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 6 }}>Tasks</h1>
+        <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 6 }}>
+          Tasks
+        </h1>
         <div style={{ opacity: 0.7, fontSize: 13 }}>
           {activeSubtitle} • total={total}
         </div>
@@ -70,29 +75,42 @@ export default function HomePage() {
 
       {/* Create task */}
       <section style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "grid", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="New task title..."
+              style={{
+                flex: 1,
+                padding: 10,
+                border: "1px solid #ccc",
+                borderRadius: 8,
+              }}
+            />
+            <button
+              onClick={onAdd}
+              disabled={loading}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 8,
+                cursor: loading ? "not-allowed" : "pointer",
+              }}
+            >
+              Add
+            </button>
+          </div>
+
           <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="New task title..."
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="Category (optional) e.g. work, home"
             style={{
-              flex: 1,
               padding: 10,
               border: "1px solid #ccc",
               borderRadius: 8,
             }}
           />
-          <button
-            onClick={onAdd}
-            disabled={loading}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 8,
-              cursor: loading ? "not-allowed" : "pointer",
-            }}
-          >
-            Add
-          </button>
         </div>
       </section>
 
@@ -191,46 +209,70 @@ export default function HomePage() {
                   border: "1px solid #eee",
                   borderRadius: 10,
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
+                  flexDirection: "column",
+                  gap: 10,
                 }}
               >
-                <label
+                <div
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 10,
-                    flex: 1,
-                    cursor: "pointer",
+                    justifyContent: "space-between",
+                    gap: 12,
                   }}
                 >
-                  <input
-                    type="checkbox"
-                    checked={task.done}
-                    onChange={(e) => toggleDone(task._id, e.target.checked)}
-                  />
-
-                  <span
+                  <label
                     style={{
-                      textDecoration: task.done ? "line-through" : "none",
-                      opacity: task.done ? 0.6 : 1,
-                      wordBreak: "break-word",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
                       flex: 1,
+                      cursor: "pointer",
                     }}
                   >
-                    {task.title}
-                  </span>
+                    <input
+                      type="checkbox"
+                      checked={task.done}
+                      onChange={(e) => toggleDone(task._id, e.target.checked)}
+                    />
 
+                    <span
+                      style={{
+                        textDecoration: task.done ? "line-through" : "none",
+                        opacity: task.done ? 0.6 : 1,
+                        wordBreak: "break-word",
+                        flex: 1,
+                      }}
+                    >
+                      {task.title}
+                    </span>
+                  </label>
+
+                  <button
+                    onClick={() => deleteTask(task._id)}
+                    title="Delete task"
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                    }}
+                  >
+                    🗑️
+                  </button>
+                </div>
+
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                   {/* Priority editor */}
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ opacity: 0.6 }}>p:</span>
+                    <span style={{ opacity: 0.6 }}>Priority</span>
                     <input
                       type="number"
                       min={1}
                       max={10}
                       value={task.priority}
-                      onChange={(e) => updatePriority(task._id, Number(e.target.value))}
+                      onChange={(e) =>
+                        updatePriority(task._id, Number(e.target.value))
+                      }
                       style={{
                         width: 64,
                         padding: "6px 8px",
@@ -239,19 +281,27 @@ export default function HomePage() {
                       }}
                     />
                   </div>
-                </label>
 
-                <button
-                  onClick={() => deleteTask(task._id)}
-                  title="Delete task"
-                  style={{
-                    padding: "6px 10px",
-                    borderRadius: 8,
-                    cursor: "pointer",
-                  }}
-                >
-                  🗑️
-                </button>
+                  {/* Category editor */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ opacity: 0.6 }}>Category</span>
+                    <input
+                      value={task.category ?? ""}
+                      onChange={(e) =>
+                        updateTaskField(task._id, {
+                          category: e.target.value.trim() ? e.target.value : null,
+                        })
+                      }
+                      placeholder="(none)"
+                      style={{
+                        width: 180,
+                        padding: "6px 8px",
+                        border: "1px solid #ccc",
+                        borderRadius: 8,
+                      }}
+                    />
+                  </div>
+                </div>
               </li>
             ))}
           </ul>
@@ -261,10 +311,10 @@ export default function HomePage() {
       {/* Pagination */}
       <footer style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <button
-          onClick={() => {
+          onClick={async () => {
             if (!canPrev) return;
             setPage(page - 1);
-            apply();
+            await apply();
           }}
           disabled={!canPrev || loading}
           style={{ padding: "10px 14px", borderRadius: 8 }}
@@ -277,10 +327,10 @@ export default function HomePage() {
         </div>
 
         <button
-          onClick={() => {
+          onClick={async () => {
             if (!canNext) return;
             setPage(page + 1);
-            apply();
+            await apply();
           }}
           disabled={!canNext || loading}
           style={{ padding: "10px 14px", borderRadius: 8 }}

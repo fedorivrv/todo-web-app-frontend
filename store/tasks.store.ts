@@ -34,13 +34,14 @@ type TasksState = {
 
   // actions
   fetchTasks: () => Promise<void>;
-  createTask: (title: string, priority?: number) => Promise<void>;
+  createTask: (title: string, priority?: number, category?: string | null) => Promise<void>;
   toggleDone: (id: string, done: boolean) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   updatePriority: (id: string, priority: number) => Promise<void>;
 
-  // generic update (useful for next steps: category/dueDate)
-  updateTaskField: <K extends keyof Pick<Task, "title" | "description" | "priority" | "done" | "category" | "dueDate">>(
+  updateTaskField: <
+    K extends keyof Pick<Task, "title" | "description" | "priority" | "done" | "category" | "dueDate">
+  >(
     id: string,
     patch: Pick<Task, K>
   ) => Promise<void>;
@@ -101,11 +102,15 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     }
   },
 
-  createTask: async (title: string, priority = 5) => {
+  createTask: async (title: string, priority = 5, category: string | null = null) => {
     set({ loading: true, error: null });
 
     try {
-      const res = await api.post<{ task: Task }>("/api/tasks", { title, priority });
+      const res = await api.post<{ task: Task }>("/api/tasks", {
+        title,
+        priority,
+        category: category && category.trim() ? category.trim() : null,
+      });
 
       set((state) => ({
         tasks: [res.data.task, ...state.tasks],
@@ -123,8 +128,8 @@ export const useTasksStore = create<TasksState>((set, get) => ({
   updateTaskField: async (id, patch) => {
     set({ error: null });
 
-    // optimistic merge
     const prev = get().tasks.find((t) => t._id === id) ?? null;
+
     set((state) => ({
       tasks: state.tasks.map((t) => (t._id === id ? { ...t, ...patch } : t)),
     }));
@@ -136,7 +141,6 @@ export const useTasksStore = create<TasksState>((set, get) => ({
         tasks: state.tasks.map((t) => (t._id === id ? res.data.task : t)),
       }));
     } catch (err: any) {
-      // rollback to previous snapshot if we had it
       set((state) => ({
         tasks: prev ? state.tasks.map((t) => (t._id === id ? prev : t)) : state.tasks,
         error: err.response?.data?.message || err.message || "Failed to update task",
@@ -159,7 +163,6 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     const prevTasks = get().tasks;
     const removed = prevTasks.find((t) => t._id === id) ?? null;
 
-    // optimistic remove
     set((state) => ({
       tasks: state.tasks.filter((t) => t._id !== id),
       total: Math.max(0, state.total - 1),
@@ -168,7 +171,6 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     try {
       await api.delete(`/api/tasks/${id}`);
     } catch (err: any) {
-      // rollback
       set({
         tasks: removed ? [removed, ...prevTasks] : prevTasks,
         total: removed ? get().total + 1 : get().total,
